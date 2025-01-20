@@ -1,0 +1,46 @@
+# Бинарные файлы и исполняемые файлы
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+gateway
+gateway_service
+
+# Временные файлы
+*.test
+*.out
+tmp/
+temp/
+
+# База данных SQLite
+*.db
+*.db-journal
+
+# Зависимости
+vendor/
+
+# IDE и редакторы
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Файлы операционной системы
+.DS_Store
+Thumbs.db
+
+# Логи
+*.log
+logs/
+
+# Конфигурационные файлы с секретами
+.env
+*.pem
+*.key
+*.crt
+
+# Директория сборки
+bin/
+dist/
