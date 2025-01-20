@@ -60,7 +60,7 @@ func DefaultConfig() *Config {
 			LogLevel: "error",
 		},
 		Security: SecurityConfig{
-			AllowedIP:       "", // должен быть установлен вручную
+			AllowedIP:       "localhost", // должен быть установлен вручную
 			SessionDuration: 3 * time.Hour,
 			CookieName:      "gateway_session",
 			CookieSecure:    true,

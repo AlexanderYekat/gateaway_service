@@ -10,6 +10,9 @@ import (
 	"gateaway_service/internal/database"
 	"gateaway_service/internal/models"
 
+	"log"
+
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/time/rate"
 )
@@ -30,6 +33,22 @@ var (
 func IPFilter(db *database.DB, cfg *config.SecurityConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := getClientIP(c)
+		userAgent := c.Request.UserAgent()
+		fingerprint := c.GetHeader("X-Fingerprint")
+
+		log.Printf("[DEBUG] Входящий запрос:\n"+
+			"Path: %s\n"+
+			"Method: %s\n"+
+			"IP: %s\n"+
+			"User-Agent: %s\n"+
+			"Fingerprint: %s\n"+
+			"Headers: %v\n",
+			c.Request.URL.Path,
+			c.Request.Method,
+			ip,
+			userAgent,
+			fingerprint,
+			c.Request.Header)
 
 		// Проверка статического разрешенного IP
 		if cfg.AllowedIP != "" && ip == cfg.AllowedIP {
@@ -77,6 +96,14 @@ func RateLimit(cfg *config.RateLimitConfig) gin.HandlerFunc {
 // RequireAuth проверяет аутентификацию пользователя
 func RequireAuth(db *database.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		sess := sessions.Default(c)
+		userID := sess.Get("user_id")
+
+		log.Printf("[DEBUG] Проверка сессии:\n"+
+			"Session ID: %v\n"+
+			"User ID: %v\n",
+			sess.ID(), userID)
+
 		// Получение cookie
 		cookie, err := c.Cookie("gateway_session")
 		if err != nil {
