@@ -119,14 +119,16 @@ Headers: %v
 }
 
 func setupRoutes(router *gin.Engine, h *handlers.Handler, db *database.DB, cfg *config.Config, auth *auth.Auth) {
-	// Публичные маршруты
+	// Все маршруты, включая /login, требуют проверки IP или fingerprint
+	router.Use(middleware.IPFilter(db, &cfg.Security)) // Глобальная проверка доступа
+
+	// Публичные маршруты (но всё ещё требуют проверки IP/fingerprint)
 	router.GET("/login", h.LoginPage)
 	router.POST("/login", h.Login)
 
-	// Защищенные маршруты
+	// Дополнительно защищенные маршруты (требуют аутентификации)
 	protected := router.Group("/")
-	protected.Use(middleware.IPFilter(db, &cfg.Security))
-	protected.Use(middleware.RequireAuth(db))
+	protected.Use(middleware.RequireAuth(db)) // Дополнительная проверка аутентификации
 	{
 		protected.GET("/status", h.Status)
 		protected.POST("/register-fingerprint", h.RegisterFingerprint)

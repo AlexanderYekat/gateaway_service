@@ -1,6 +1,9 @@
 package middleware
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -29,26 +32,41 @@ var (
 	cleanupInterval = 5 * time.Minute
 )
 
+// generateFingerprint создает отпечаток на основе заголовков
+func generateFingerprint(c *gin.Context) string {
+	// Собираем значимые заголовки
+	components := []string{
+		c.Request.UserAgent(),
+		c.GetHeader("Accept-Language"),
+		c.GetHeader("Sec-Ch-Ua"),
+		c.GetHeader("Sec-Ch-Ua-Platform"),
+		c.GetHeader("Sec-Ch-Ua-Mobile"),
+	}
+
+	// Создаем строку для хеширования
+	fingerprint := fmt.Sprintf("%v", components)
+
+	// Создаем SHA-256 хеш
+	hasher := sha256.New()
+	hasher.Write([]byte(fingerprint))
+	return hex.EncodeToString(hasher.Sum(nil))
+}
+
 // IPFilter проверяет IP-адрес запроса
 func IPFilter(db *database.DB, cfg *config.SecurityConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := getClientIP(c)
 		userAgent := c.Request.UserAgent()
-		fingerprint := c.GetHeader("X-Fingerprint")
+		browserFingerprint := generateFingerprint(c)
 
-		log.Printf("[DEBUG] Входящий запрос:\n"+
-			"Path: %s\n"+
-			"Method: %s\n"+
-			"IP: %s\n"+
-			"User-Agent: %s\n"+
-			"Fingerprint: %s\n"+
-			"Headers: %v\n",
-			c.Request.URL.Path,
-			c.Request.Method,
-			ip,
-			userAgent,
-			fingerprint,
-			c.Request.Header)
+		log.Printf(`
+=== Данные для добавления в базу ===
+IP адрес: %s
+User-Agent: %s
+Сгенерированный fingerprint: %s
+URL запроса: %s
+===============================`,
+			ip, userAgent, browserFingerprint, c.Request.URL.Path)
 
 		// Проверка статического разрешенного IP
 		if cfg.AllowedIP != "" && ip == cfg.AllowedIP {
@@ -63,9 +81,16 @@ func IPFilter(db *database.DB, cfg *config.SecurityConfig) gin.HandlerFunc {
 			First(&whitelistedIP)
 
 		if result.Error != nil {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
-			c.Abort()
-			return
+			// Проверяем fingerprint если IP не разрешен
+			var user models.User
+			fingerprintResult := db.Where("allowed_fingerprints LIKE ?",
+				fmt.Sprintf("%%%s%%", browserFingerprint)).First(&user)
+
+			if fingerprintResult.Error != nil {
+				c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+				c.Abort()
+				return
+			}
 		}
 
 		c.Next()
